@@ -9,22 +9,271 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Principal Component Analysis
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Installing necessary libraries for our data analysis.
+<br>
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r message=FALSE, warning=FALSE, collapse=TRUE}
 
-```{r cars}
-summary(cars)
+library("tidyverse")
+library("dplyr")
+library("knitr")
+library("kableExtra")
+library("readxl")
+library("ggrepel") #for plots (but optional)
+library("ggthemes")#for plots (but optional)
+
+fivb_wc <- read_excel(path = "Stat147A4.xlsx", sheet = "stats leader per team")
+fivb_wc
+```
+<br>
+<br>
+Conducting principal component analysis using prcomp code.
+<br>
+
+```{r fivb_wc}
+data_matrix <- fivb_wc %>% select(`Attack pts per match`:`Reception Impact and Efficiency`)
+pca_vball   <- prcomp(x = data_matrix, scale. = TRUE)
+```
+<br>
+<br>
+
+### How many principal components should we retain?
+
+<br>
+
+
+The table below provides us a summary statistic for each of the principal components. 
+
+It is recommended to prioritize PCs with high standard deviations. Among the first three PCs, all have a standard deviation greater than 1. However, it is worth noting that PC4 has a standard deviation of 0.98, which is close to 1. Therefore, including PC4 should be considered due to potential sampling variation.
+
+We should retain the first k number of PCs that account for at least 80% of the cumulative total variance. In this case, the cumulative total variance until PC4 is 0.8409. Comparing this with the above recommendation, which advises retaining 4 PCs, a discrepancy arises.
+
+However, using 4 PCs may compromise interpretability. The coefficients of the variables in PC4 are nonsensical, with four of them having low magnitudes and the remaining five being negative. Therefore, taking all these factors into consideration, it is recommended to use three principal components.
+<br>
+
+
+```{r}
+  summary(pca_vball)$importance %>%
+  kable %>%
+  kable_styling("striped", full_width = F) 
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+<br>
+<br>
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+#### Attaching P-scores to the data
+
+<br>
+
+For this part, we attach the p-scores to the original data. 
+
+```{r echo = FALSE, results = 'asis'}
+
+data_with_scores <- fivb_wc %>%
+  bind_cols(pca_vball$x)
+
+kbl(cbind(data_with_scores)) %>%
+  kable_paper() %>%
+  kable_styling("striped", full_width = F) %>%
+  scroll_box(width = "100%", height = "400px")
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+<br>
+<br>
+
+### Best Players per PCs
+
+```{r}
+kbl(pca_vball$rotation[,c(1:3)]) %>%
+  kable_paper() %>%
+  kable_styling("striped", full_width = F)
+```
+<br>
+
+
+#### PC1 : "The Guardian Angels"  
+
+<br>
+
+The coefficients for block efficiency and excellent sets per match have low magnitudes, indicating that these variables should not be emphasized in the interpretation of PC1. This principal component captures 31.17% of the data's variability and represents a characteristic stat of a libero in volleyball, hence referred to as the "Guardian Angel" Dimension.
+
+A high score on PC1 indicates players with excellent digs, reception, and high impact and efficiency in reception. Conversely, a low score is associated with players who have high blocks per match, serving aces per match, attacking impact and efficiency, and attacks per match. These statistics are typically observed in players who excel in jumping, whether for attacking or blocking.
+
+Players with high PC1 values serve as the guardians of the ground, watching over the backcourt players who jump. Although their role may appear less glamorous, it is equally vital because, in volleyball, preventing the ball from touching the ground is crucial.
+<br>
+
+##### Players with highest and lowest PC1 Score
+
+<br>
+
+```{r echo=FALSE}
+
+PC1_highplayer <- data_with_scores %>% slice_max(PC1)
+PC1_lowplayer <- data_with_scores %>% slice_min(PC1)
+
+kbl(rbind(PC1_highplayer[1:15],PC1_lowplayer[1:15])) %>%
+  kable_paper() %>%
+  kable_styling("striped", full_width = F)
+
+```
+
+Here are examples of players who have high scores in PC1: De Gennaro Monica from Italy, Gomez Camila from Colombia, and Wang Mengjie from China. Conversely, players with low scores in PC1 include Stysiak Magdalena from Poland, Gonzalez Lopez Gaila Ceneida from the Dominican Republic, and Ortiz Neira from Puerto Rico.
+
+<br>
+<br>
+
+#### PC2 : "The Scoring Machines" 
+
+<br>
+
+The coefficient for block efficiency in this PC has a low magnitude, suggesting that it should not be highlighted in the interpretation of PC2. This principal component accounts for 27.45% of the data's variability and is characterized by high coefficients for attack points per match and attacking impact and efficiency, earning it the name "Scoring Machine" dimension.
+
+A notable observation is that PC2 tends to have a negative relationship with the number of excellent sets per match, while displaying a positive relationship with the other seven variables, leading to higher scores. Among the various methods of scoring in volleyball, spiking through attacks is the most common, resulting in higher PC2 scores for spikers.
+
+<br>
+
+#### Players with highest and lowest PC2 Score
+
+<br>
+
+```{r echo=FALSE}
+PC2_highplayer <- data_with_scores %>% slice_max(PC2)
+PC2_lowplayer <- data_with_scores %>% slice_min(PC2)
+
+kbl(rbind(PC2_highplayer[c(-15,-17:-23)],PC2_lowplayer[c(-15,-17:-23)])) %>%
+  kable_paper() %>%
+  kable_styling("striped", full_width = F)
+```
+
+Examples of players who achieve high scores in PC2 include Herbots Britt from Belgium, Li Yingying from China, and Braga Guimaraes Grabriela from Brazil. Conversely, some of the lowest scores in PC2 are observed in Wolosz Joanna from Poland, Deak Lea from Croatia, and Mayer Victoria from Argentina.
+
+<br>
+<br>
+
+#### PC3 : "The Iron Walls"  
+
+<br>
+
+The coefficients for excellent reception per match and reception impact and efficiency in this PC have low magnitudes, suggesting that these variables should not be emphasized in the interpretation of PC3. This principal component accounts for 14.76% of the data's variability. A notable characteristic of PC3 is that only the coefficients for block points per match and block efficiency are positive, while the other five variables are negative. Players with high scores in PC3 excel in scoring points through blocks and exhibit high block efficiency, earning this dimension the name "Iron Wall."
+
+The players who score high in PC3 demonstrate a remarkable ability to suppress opposing team attacks, making it feel as if the opponents are constantly hitting an impenetrable wall. Their primary focus is not on scoring or ground defense, but rather on preventing the opponents from scoring. This aligns with the characteristics of a middle blocker position in volleyball.
+
+<br>
+
+#### Players with highest and lowest PC3 Score
+
+<br>
+
+```{r echo=FALSE}
+
+PC3_highplayer <- data_with_scores %>% slice_max(PC3)
+PC3_lowplayer <- data_with_scores %>% slice_min(PC3)
+
+kbl(rbind(PC3_highplayer[c(1:14,17)],PC3_lowplayer[c(1:14,17)])) %>%
+  kable_paper() %>%
+  kable_styling("striped", full_width = F)
+
+```
+
+Examples of players who score high in PC3 include Da Silva Ana Carolina from Brazil, Smirnova Natalya from Kazakhstan, and Ortiz Neira from Puerto Rico. Conversely, players who score low in PC3 include Deak Lea from Croatia, Wolosz Joanna from Poland, and Lee Seonwoo from Korea.
+
+<br>
+<br>
+
+#### Scree Plot
+
+```{r warning=FALSE,fig.align='center'}
+variance = pca_vball $sdev^2 / sum(pca_vball $sdev^2)
+scree_plot <- qplot(c(1:9), variance) +
+  geom_line() +
+  geom_point(size=9)+
+  xlab("Principal Component") +
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot") +
+  ylim(0, 0.5) 
+
+screeplot(pca_vball)
+```
+
+
+#### Compare and contrast the different volleyball positions “setter”, “libero”,and “spiker” with respect to the chosen PCs.
+<br>
+<br>
+
+```{r warning=FALSE,fig.align='center'}
+data_with_scores %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(aes(col = position)) +
+  scale_color_manual(values = c("forestgreen", "firebrick", "blue")) +
+  theme_gdocs()
+```
+<br>
+<br>
+From the graph, the liberos are almost similar and they are clustered in their position in PC1 and PC2. They are high scoring in PC1 and low scoring in PC2 since they are below the zero mark. The setters are some of the lowest scoring in PC2, and at the zero mark with respect to PC1. The spikers are all around the place since the spiker is composed of different subroles in volleyball; wing spikers who are the ones the team relies on to score (PC2), the middle blockers who are responsible for the defensive blocks of the team (PC3), and outside hitters who are all-rounders. 
+<br>
+<br>
+```{r warning=FALSE,fig.align='center'}
+data_with_scores %>%
+  ggplot(aes(x = PC1, y = PC3)) +
+  geom_point(aes(col = position)) +
+  scale_color_manual(values = c("forestgreen", "firebrick", "blue")) +
+  theme_gdocs()
+```
+<br>
+<br>
+The setters are the lowest scoring in PC2 as well as PC3. They do not score and do not block as their main role is to assist the spikers by tossing the ball. The liberos are at the 0 mark for PC2 and lower. One thing that we could notice here is that the liberos score above 0 in PC3, where we stated that PC3 is for players who block the opponent's spikes. Clearly, from the volleyball rules, we know that liberos are not allowed to jump when they are close to the net, so liberos have no scores for blocking. We could say that the reason for this is because in PC3, the loadings for excellent digs and receive impact is small, so the score would not drop significantly compared to other players. 
+<br>
+<br>
+
+```{r warning=FALSE,fig.align='center'}
+data_with_scores %>%
+  ggplot(aes(x = PC2, y = PC3)) +
+  geom_point(aes(col = position)) +
+  scale_color_manual(values = c("forestgreen", "firebrick", "blue")) +
+  theme_gdocs()
+```
+<br>
+<br>
+In the graph comparing PC1 and PC3, the same observations can be made where the libero is on the positive side of PC3. Some of the setters are scoring points, but most of them are at the 0 mark and below. The spikers are still spread out. 
+
+<br>
+<br>
+
+### Outliers 
+#### PC7vsPC9 palitan lang yung PCs na icocompare sa function
+
+```{r warning=FALSE,fig.align='center'}
+spikers_only <- data_with_scores %>% filter(position == "spiker") %>% select(PC7, PC9)
+mahal_dist <- mahalanobis(x      = spikers_only, 
+                          center = cbind(apply(spikers_only, 2, median)),
+                          cov    = var(spikers_only))
+
+head(mahal_dist)
+sum(mahal_dist > 9)
+```
+
+
+
+```{r warning=FALSE,fig.align='center'}
+data_with_scores %>%
+  filter(position == "spiker") %>%
+  mutate(dist = mahal_dist,
+         tag  = if_else(dist > 9, "outlier", "normal"),
+         label= if_else(dist > 9, `Player Name`, "")
+  )%>%
+  ggplot(aes(x = PC7, y = PC9)) +
+  geom_point(aes(col = tag), show.legend = F) +
+  geom_text_repel(aes(label = label)) +
+  scale_color_manual(values = c("gray80", "firebrick")) +
+  theme_gdocs()
+
+```
+
+
+
+
